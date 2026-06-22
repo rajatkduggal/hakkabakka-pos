@@ -13,10 +13,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use("/login", loginRoutes);
-app.use("/menu", menuRoutes);
 app.use(cors());
 app.use(express.json());
+
+app.use("/login", loginRoutes);
+app.use("/menu", menuRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hakka Bakka POS Server Running");
