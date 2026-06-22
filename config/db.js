@@ -8,16 +8,13 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
 
-pool.getConnection((err, connection) => {
-  if (err) {
-    console.log("Database connection failed:", err);
-  } else {
-    console.log("MySQL Pool Connected");
-    connection.release();
-  }
+pool.on("error", (err) => {
+  console.error("MySQL Pool Error:", err);
 });
 
 module.exports = pool.promise();
