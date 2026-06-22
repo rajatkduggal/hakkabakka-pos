@@ -1,3 +1,4 @@
+const menuRoutes = require("./routes/menu");
 const loginRoutes = require("./routes/login");
 const db = require("./config/db");
 const express = require("express");
@@ -13,6 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use("/login", loginRoutes);
+app.use("/menu", menuRoutes);
 app.use(cors());
 app.use(express.json());
 
