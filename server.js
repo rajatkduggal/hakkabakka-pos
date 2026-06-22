@@ -1,3 +1,4 @@
+const loginRoutes = require("./routes/login");
 const db = require("./config/db");
 const express = require("express");
 const cors = require("cors");
@@ -11,6 +12,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.use("/login", loginRoutes);
 app.use(cors());
 app.use(express.json());
 
