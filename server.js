@@ -18,17 +18,17 @@ const io = new Server(server);
 app.use(cors());
 app.use(express.json());
 
-// API Routes
+// Routes
 app.use("/login", loginRoutes);
 app.use("/menu", menuRoutes);
 app.use("/orders", orderRoutes);
 
-// Home Route
+// Home route
 app.get("/", (req, res) => {
   res.send("Hakka Bakka POS Server Running");
 });
 
-// Tables Route
+// Tables route
 app.get("/tables", (req, res) => {
   const tables = [];
 
@@ -42,7 +42,7 @@ app.get("/tables", (req, res) => {
   res.json(tables);
 });
 
-// Database Test Route
+// Database test route
 app.get("/db-test", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT 1");
@@ -59,7 +59,7 @@ app.get("/db-test", async (req, res) => {
   }
 });
 
-// Socket Connection
+// Socket.io
 io.on("connection", (socket) => {
   console.log("Client Connected");
 
@@ -68,9 +68,9 @@ io.on("connection", (socket) => {
   });
 });
 
-// Start Server
+// Start server
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("Server running on port " + PORT);
 });
