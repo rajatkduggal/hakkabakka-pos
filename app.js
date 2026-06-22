@@ -1,6 +1,9 @@
 window.onload = function () {
-  fetch("https://rdl70wqz.c36.airoapp.ai/menu")
+  fetch("https://utrdl70wqz.c36.airoapp.ai/menu")
     .then(function(response) {
+      if (!response.ok) {
+        throw new Error("Server error");
+      }
       return response.json();
     })
     .then(function(data) {
@@ -19,6 +22,7 @@ window.onload = function () {
     })
     .catch(function(error) {
       console.log("Error:", error);
-      document.getElementById("menu").innerHTML = "Menu load failed";
+      document.getElementById("menu").innerHTML =
+        "<p>Menu load failed. Check backend.</p>";
     });
 };
