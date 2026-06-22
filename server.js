@@ -1,4 +1,4 @@
-
+const db = require("./config/db");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -27,6 +27,15 @@ app.get("/tables", (req, res) => {
     });
   }
   res.json(tables);
+});
+app.get("/db-test", (req, res) => {
+  db.query("SELECT * FROM restaurant_tables", (err, result) => {
+    if (err) {
+      res.send(err);
+    } else {
+      res.json(result);
+    }
+  });
 });
 
 io.on("connection", (socket) => {
