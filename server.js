@@ -1,3 +1,4 @@
+const orderRoutes = require("./routes/orders");
 const menuRoutes = require("./routes/menu");
 const loginRoutes = require("./routes/login");
 const db = require("./config/db");
@@ -18,7 +19,7 @@ app.use(express.json());
 
 app.use("/login", loginRoutes);
 app.use("/menu", menuRoutes);
-
+app.use("/orders", orderRoutes);
 app.get("/", (req, res) => {
   res.send("Hakka Bakka POS Server Running");
 });
