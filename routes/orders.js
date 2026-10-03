@@ -69,7 +69,7 @@ router.post("/online", async (req, res) => {
 
 router.post("/test", async (req, res) => {
   const o = cleanOrder(req.body);
-  if (!o.order_no || !o.order_type || !o.customer_name || !/^\\d{10}$/.test(o.customer_phone)) {
+  if (!o.order_no || !o.order_type || !o.customer_name || !/^\d{10}$/.test(o.customer_phone)) {
     return res.status(400).json({ success: false, message: "Missing or invalid test order/customer details." });
   }
   if (!o.items.length || !Number.isFinite(o.total) || o.total <= 0) {
