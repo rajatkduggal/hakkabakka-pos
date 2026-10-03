@@ -1,16 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hakka Bakka POS</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HakkaBakka POS</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    body{font-family:system-ui,sans-serif;background:#fbf5eb;color:#2b211b;margin:0;padding:24px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+    h1{color:#741015;margin:0}.sub{color:#76685e}
+    #orders{display:grid;gap:14px;max-width:900px}
+    .order-card{background:#fff;border:1px solid #ead8c5;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4a2a1710}
+    .order-head{display:flex;justify-content:space-between;font-size:18px}.order-head span{font-size:12px;margin-left:8px;color:#76685e}
+    .order-customer,.order-status{margin-top:8px;color:#5f554d}.order-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+    button{border:0;border-radius:999px;padding:10px 14px;background:#741015;color:#fff;font-weight:700}
+    button:disabled{opacity:.5}.empty{padding:30px;background:#fff;border-radius:18px;text-align:center}.bad{color:#a10f16}
+  </style>
 </head>
 <body>
-
-<h1>Hakka Bakka Menu</h1>
-
-<div id="menu"></div>
-
-<script src="app.js"></script>
-
+  <header><div><h1>HakkaBakka POS</h1><div class="sub">Online Orders</div></div><button onclick="loadOrders()">Refresh</button></header>
+  <main id="orders"></main>
+  <script>window.POS_API_BASE = location.origin;</script>
+  <script src="app.js"></script>
 </body>
 </html>
