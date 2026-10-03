@@ -67,6 +67,49 @@ router.post("/online", async (req, res) => {
   }
 });
 
+router.post("/test", async (req, res) => {
+  const o = cleanOrder(req.body);
+  if (!o.order_no || !o.order_type || !o.customer_name || !/^\\d{10}$/.test(o.customer_phone)) {
+    return res.status(400).json({ success: false, message: "Missing or invalid test order/customer details." });
+  }
+  if (!o.items.length || !Number.isFinite(o.total) || o.total <= 0) {
+    return res.status(400).json({ success: false, message: "Test order items and total are required." });
+  }
+  const calculatedFood = o.items.reduce((sum, x) => sum + (x.price * x.qty), 0);
+  if (Math.abs(calculatedFood - o.food_total) > 0.01 || Math.abs((o.food_total + o.delivery_charges) - o.total) > 0.01) {
+    return res.status(400).json({ success: false, message: "Test order total validation failed." });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [result] = await conn.query(
+      `INSERT INTO orders
+      (order_no, source, order_type, customer_name, customer_phone, address, pincode, food_total, delivery_charges, total, payment_status, status, special_instructions)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?)`,
+      [o.order_no, "TEST", o.order_type, o.customer_name, o.customer_phone, o.address, o.pincode, o.food_total, o.delivery_charges, o.total, "TEST_NOT_CHARGED", "POS_TEST"]
+    );
+    for (const item of o.items) {
+      await conn.query("INSERT INTO order_items (order_id, item_name, qty, price) VALUES (?, ?, ?, ?)",
+        [result.insertId, item.name, item.qty, item.price]);
+    }
+    await conn.rollback();
+    return res.status(200).json({
+      success: true,
+      test: true,
+      rolled_back: true,
+      message: "POS test passed. Database transaction was rolled back; no order was saved.",
+      validated_items: o.items.length
+    });
+  } catch (error) {
+    await conn.rollback();
+    console.error("POS test error:", error);
+    return res.status(500).json({ success: false, message: "POS test failed." });
+  } finally {
+    conn.release();
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const source = String(req.query.source || "").trim().toUpperCase();
