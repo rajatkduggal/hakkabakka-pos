@@ -18,19 +18,32 @@ CREATE TABLE restaurant_tables (
 
 CREATE TABLE orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  table_no INT,
-  order_type VARCHAR(50),
-  total DECIMAL(10,2),
-  status VARCHAR(50),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  order_no VARCHAR(40) NOT NULL UNIQUE,
+  source VARCHAR(30) NOT NULL DEFAULT 'POS',
+  table_no INT NULL,
+  order_type VARCHAR(50) NOT NULL,
+  customer_name VARCHAR(100),
+  customer_phone VARCHAR(20),
+  address TEXT,
+  pincode VARCHAR(10),
+  food_total DECIMAL(10,2) NOT NULL DEFAULT 0,
+  delivery_charges DECIMAL(10,2) NOT NULL DEFAULT 0,
+  total DECIMAL(10,2) NOT NULL DEFAULT 0,
+  payment_status VARCHAR(50) NOT NULL DEFAULT 'UNPAID',
+  status VARCHAR(50) NOT NULL DEFAULT 'NEW',
+  special_instructions TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_orders_status_created (status, created_at),
+  INDEX idx_orders_source_created (source, created_at)
 );
 
 CREATE TABLE order_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  order_id INT,
-  item_name VARCHAR(100),
-  qty INT,
-  price DECIMAL(10,2)
+  order_id INT NOT NULL,
+  item_name VARCHAR(150) NOT NULL,
+  qty INT NOT NULL DEFAULT 1,
+  price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
 INSERT INTO restaurant_tables (table_no, status) VALUES
