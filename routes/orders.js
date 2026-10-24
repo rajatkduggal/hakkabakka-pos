@@ -16,6 +16,7 @@ function cleanOrder(body) {
     delivery_charges: Number(body.delivery_charges || 0),
     total: Number(body.total_amount ?? body.total ?? 0),
     payment_status: String(body.payment_status || "UNPAID").trim().toUpperCase(),
+    payment_reference: String(body.payment_reference || "").replace(/\D/g, "") || null,
     special_instructions: body.special_instructions ? String(body.special_instructions).trim() : null,
     items: items.map((x) => ({
       name: String(x.name || "").trim(),
@@ -25,11 +26,25 @@ function cleanOrder(body) {
   };
 }
 
+router.get("/payment-reference/:reference", async (req, res) => {
+  const reference = String(req.params.reference || "").replace(/\D/g, "");
+  if (reference.length < 8 || reference.length > 30) return res.status(400).json({ success: false, message: "Invalid payment reference." });
+  try {
+    const [rows] = await db.query("SELECT order_no, created_at FROM orders WHERE payment_reference=? LIMIT 1", [reference]);
+    if (rows.length) return res.json({ success: true, used: true, order_no: rows[0].order_no, created_at: rows[0].created_at });
+    return res.json({ success: true, used: false });
+  } catch (error) {
+    console.error("Payment reference lookup error:", error);
+    return res.status(500).json({ success: false, message: "Could not check payment reference." });
+  }
+});
+
 router.post("/online", async (req, res) => {
   const o = cleanOrder(req.body);
   if (!o.order_no || !o.order_type || !o.customer_name || !/^\d{10}$/.test(o.customer_phone)) {
     return res.status(400).json({ success: false, message: "Missing or invalid order/customer details." });
   }
+  if (!o.payment_reference || o.payment_reference.length < 8) return res.status(400).json({ success: false, message: "Successful payment reference is required." });
   if (!o.items.length || !Number.isFinite(o.total) || o.total <= 0) {
     return res.status(400).json({ success: false, message: "Order items and total are required." });
   }
@@ -41,6 +56,11 @@ router.post("/online", async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+    const [existingRef] = await conn.query("SELECT id, order_no FROM orders WHERE payment_reference=? LIMIT 1", [o.payment_reference]);
+    if (existingRef.length) {
+      await conn.rollback();
+      return res.status(409).json({ success: false, duplicate_payment: true, message: "Payment already used for order " + existingRef[0].order_no + "." });
+    }
     const [existing] = await conn.query("SELECT id, order_no FROM orders WHERE order_no=? LIMIT 1", [o.order_no]);
     if (existing.length) {
       await conn.rollback();
@@ -48,9 +68,9 @@ router.post("/online", async (req, res) => {
     }
     const [result] = await conn.query(
       `INSERT INTO orders
-      (order_no, source, order_type, customer_name, customer_phone, address, pincode, food_total, delivery_charges, total, payment_status, status, special_instructions)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?)`,
-      [o.order_no, o.source, o.order_type, o.customer_name, o.customer_phone, o.address, o.pincode, o.food_total, o.delivery_charges, o.total, o.payment_status, o.special_instructions]
+      (order_no, source, order_type, customer_name, customer_phone, address, pincode, food_total, delivery_charges, total, payment_status, payment_reference, status, special_instructions)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?)`,
+      [o.order_no, o.source, o.order_type, o.customer_name, o.customer_phone, o.address, o.pincode, o.food_total, o.delivery_charges, o.total, o.payment_status, o.payment_reference, o.special_instructions]
     );
     for (const item of o.items) {
       await conn.query("INSERT INTO order_items (order_id, item_name, qty, price) VALUES (?, ?, ?, ?)",
