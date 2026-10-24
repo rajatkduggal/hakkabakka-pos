@@ -25,3 +25,9 @@ ALTER TABLE order_items
   MODIFY COLUMN qty INT NOT NULL DEFAULT 1,
   MODIFY COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0;
 
+
+
+-- Payment-reference reuse protection for online UPI orders.
+ALTER TABLE orders
+  ADD COLUMN payment_reference VARCHAR(40) NULL,
+  ADD UNIQUE KEY uq_orders_payment_reference (payment_reference);
