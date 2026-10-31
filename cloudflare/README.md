@@ -1,31 +1,22 @@
 # HakkaBakka POS — Cloudflare D1 integration branch
 
-This is an isolated implementation branch. It does not alter the live website or deploy automatically.
+This branch is an isolated preview. The live customer website, online checkout, UPI settings and production orders must remain unchanged during setup and testing.
 
-## Architecture
-- `DB`: existing `hakkabakka-admin` D1 database (admin sessions + POS tables/counters).
-- `ORDERS`: existing `hb-orders` D1 database (shared order ledger).
-- Requires an existing admin session token. Send it as `Authorization: Bearer <token>` or the `hb_admin_session` cookie.
-- Payment state is always created as `PENDING`; never treat a UPI screenshot/reference as verified payment.
+## Database plan
+- Existing admin D1: admin sessions, menu catalogue, 20 dine-in tables and monthly POS order-number counters.
+- Existing orders D1: shared order ledger for POS and online orders.
+- `cloudflare/migrations/0001_pos_tables.sql`: additive 20-table and counter migration.
+- `cloudflare/migrations/0002_pos_operations_draft.sql`: draft-only operational tables for order metadata/items, payment attempts, KOT/reprints, cashier shifts, cash movements and audit history.
 
-## Files
-- `cloudflare/pos-worker.js`: Worker API source.
-- `cloudflare/migrations/0001_pos_tables.sql`: additive schema for 20 tables and POS order counters.
+## Agreed operating setup
+- 20 tables; one billing counter.
+- Thermal printer: PSF588; KOT print and reprint workflow to be tested on the actual device.
+- Dine-in, takeaway, delivery and online orders.
+- Payment records default to PENDING. UPI screenshot/reference is not automatic payment verification.
+- Order number sequence: monthly counter; format HB-POS-YYYYMM-00001.
+- Cloudflare Workers + D1 only. No Railway.
 
-## Routes
-- `GET /health`
-- Authenticated `GET /api/tables`
-- Authenticated `GET /api/orders`
-- Authenticated `POST /api/orders`
-- Authenticated `PATCH /api/orders/:order_number/status`
-- Authenticated `GET /api/reports/daily`
+## Important status
+The operational migration is a draft and has NOT been applied to any database. Before applying it, confirm the target preview D1 database, take a backup, inspect the existing schema, and test migration in isolation. Do not apply it to production during setup.
 
-## Before deployment
-1. Back up both D1 databases.
-2. Verify the Admin API's session token hashing and cookie name. This worker assumes SHA-256 hex in `admin_sessions.token_hash` and cookie `hb_admin_session`.
-3. Apply the migration to a staging copy first.
-4. Restrict CORS to the actual admin/POS origins.
-5. Run concurrent order-number tests and printer tests on the real PSF588 device.
-6. Do not point a public production domain to this worker until authentication and end-to-end tests pass.
-
-The Worker API is not yet a complete POS user interface. The existing Node/MySQL application remains unchanged in this branch.
+The current POS login proxy still depends on the separate Admin API route. The known `/api/login` upstream currently returns HTTP 404; do not work around this by guessing an endpoint or pointing POS at the customer orders Worker.
