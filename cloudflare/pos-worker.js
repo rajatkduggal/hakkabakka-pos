@@ -113,13 +113,16 @@ export default {async fetch(request,env){
     if(statusMatch&&request.method==="PATCH"){
       const status=String((await request.json()).status||"").toUpperCase();
       if(!["NEW","ACCEPTED","PREPARING","READY","OUT_FOR_DELIVERY","COMPLETED","CANCELLED"].includes(status))return json({error:"Invalid status"},400,request);
-      const order=decodeURIComponent(statusMatch[1]),result=await env.ORDERS.prepare("UPDATE orders SET order_status=? WHERE order_number=?").bind(status,order).run();
+      const order=decodeURIComponent(statusMatch[1]);
+      let db=env.ORDERS,source="POS";
+      let result=await db.prepare("UPDATE orders SET order_status=? WHERE order_number=?").bind(status,order).run();
+      if(!result.meta.changes){db=env.CUSTOMER_ORDERS;source="ONLINE";result=await db.prepare("UPDATE orders SET order_status=? WHERE order_number=?").bind(status,order).run();}
       if(!result.meta.changes)return json({error:"Order not found"},404,request);
-      if(["COMPLETED","CANCELLED"].includes(status)){
+      if(source==="POS"&&["COMPLETED","CANCELLED"].includes(status)){
         const row=await env.ORDERS.prepare("SELECT items_json FROM orders WHERE order_number=?").bind(order).first(),details=safeJson(row?.items_json);
         if(details?.table_no)await env.DB.prepare("UPDATE pos_tables SET status='AVAILABLE',current_order_number=NULL,updated_at=datetime('now') WHERE table_no=? AND current_order_number=?").bind(details.table_no,order).run();
       }
-      return json({success:true,status},200,request);
+      return json({success:true,status,source},200,request);
     }
     if(path==="/api/reports/daily"&&request.method==="GET"){
       const [pos,online]=await Promise.all([
