@@ -95,19 +95,14 @@ export default {async fetch(request,env){
       const paymentStatus=String((await request.json()).payment_status||"").toUpperCase();
       if(!["PENDING","PAID","FAILED","REFUNDED"].includes(paymentStatus))return json({error:"Invalid payment status"},400,request);
       const order=decodeURIComponent(paymentMatch[1]);
-      if(paymentStatus==="PAID"){
-        let current=await env.ORDERS.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();
-        const db=current?env.ORDERS:env.CUSTOMER_ORDERS;
-        if(!current)current=await env.CUSTOMER_ORDERS.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();
-        if(!current)return json({error:"Order not found"},404,request);
-        if(current.payment_status==="PAID")return json({success:true,payment_status:"PAID",already_paid:true},200,request);
-        const result=await db.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,order).run();
-        if(!result.meta.changes)return json({error:"Order not found"},404,request);
-        return json({success:true,payment_status:paymentStatus,manual_confirmation:true,source:db===env.ORDERS?"POS":"ONLINE"},200,request);
-      }
-      const result=await env.ORDERS.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,order).run();
+      let current=await env.ORDERS.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();
+      let db=env.ORDERS,source="POS";
+      if(!current){db=env.CUSTOMER_ORDERS;source="ONLINE";current=await db.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();}
+      if(!current)return json({error:"Order not found"},404,request);
+      if(paymentStatus==="PAID"&&current.payment_status==="PAID")return json({success:true,payment_status:"PAID",already_paid:true,source},200,request);
+      const result=await db.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,order).run();
       if(!result.meta.changes)return json({error:"Order not found"},404,request);
-      return json({success:true,payment_status:paymentStatus,manual_confirmation:true},200,request);
+      return json({success:true,payment_status:paymentStatus,manual_confirmation:paymentStatus==="PAID",source},200,request);
     }
     const statusMatch=path.match(/^\/api\/orders\/([^/]+)\/status$/);
     if(statusMatch&&request.method==="PATCH"){
