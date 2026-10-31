@@ -55,7 +55,7 @@ export default {async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{status:204,headers:corsFor(request)});
   const url=new URL(request.url),path=url.pathname.replace(/\/+$/,"")||"/";
   if(path==="/health")return json({ok:true,service:"hakkabakka-pos-api",mode:"cloudflare-d1"},200,request);
-  if(path==="/api/login"&&request.method==="POST"){try{const body=await request.json();const upstream=await fetch("https://hakkabakka-admin-api.mail-marvelgroup.workers.dev/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:String(body.password||"")})});const data=await upstream.json();return json(data,upstream.status,request)}catch(e){return json({error:"Admin login service unavailable"},502,request)}}
+  if(path==="/api/login"&&request.method==="POST"){try{const body=await request.json();const upstream=await fetch("https://hakkabakka-admin-api.mail-marvelgroup.workers.dev/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:String(body.password||"")})});const raw=await upstream.text();let data;try{data=JSON.parse(raw)}catch{return json({error:"Admin login service returned an invalid response (HTTP "+upstream.status+")"},502,request)}return json(data,upstream.status,request)}catch(e){console.error("POS admin login proxy error",String(e&&e.message||e));return json({error:"Admin login connection failed: "+String(e&&e.message||"upstream fetch error").slice(0,180)},502,request)}}
   if(!await authorized(request,env))return json({error:"Admin session required"},401,request);
   try{
     if(path==="/api/menu"&&request.method==="GET"){
