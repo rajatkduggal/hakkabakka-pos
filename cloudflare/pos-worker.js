@@ -122,8 +122,12 @@ export default {async fetch(request,env){
       return json({success:true,status},200,request);
     }
     if(path==="/api/reports/daily"&&request.method==="GET"){
-      const rows=await env.ORDERS.prepare("SELECT COUNT(*) order_count,COALESCE(SUM(total_amount),0) gross_sales FROM orders WHERE date(created_at)=date('now','localtime') AND json_extract(items_json,'$.source')='POS'").first();
-      return json({date:new Date().toISOString().slice(0,10),orders:rows?.order_count||0,gross_sales:rows?.gross_sales||0},200,request);
+      const [pos,online]=await Promise.all([
+        env.ORDERS.prepare("SELECT COUNT(*) order_count,COALESCE(SUM(total_amount),0) gross_sales FROM orders WHERE date(created_at,'+5 hours','+30 minutes')=date('now','+5 hours','+30 minutes') AND order_status<>'CANCELLED'").first(),
+        env.CUSTOMER_ORDERS.prepare("SELECT COUNT(*) order_count,COALESCE(SUM(total_amount),0) gross_sales FROM orders WHERE date(created_at,'+5 hours','+30 minutes')=date('now','+5 hours','+30 minutes') AND order_status<>'CANCELLED'").first()
+      ]);
+      const posOrders=Number(pos?.order_count||0),onlineOrders=Number(online?.order_count||0),posSales=Number(pos?.gross_sales||0),onlineSales=Number(online?.gross_sales||0);
+      return json({date:new Date(Date.now()+19800000).toISOString().slice(0,10),orders:posOrders+onlineOrders,gross_sales:Number((posSales+onlineSales).toFixed(2)),pos_orders:posOrders,online_orders:onlineOrders,pos_sales:Number(posSales.toFixed(2)),online_sales:Number(onlineSales.toFixed(2))},200,request);
     }
     return json({error:"Not found"},404,request);
   }catch(error){console.error("POS API error",error);return json({error:"POS request failed"},500,request);}
