@@ -10,6 +10,7 @@ const allowedOrigins = new Set([
   "https://hakkabakka.in",
   "https://www.hakkabakka.in",
   "https://hakkabakka-customer-preview.pages.dev",
+  "https://hakkabakka-customer-preview.pages.dev",
   "https://54d485f0.hakkabakka-admin-dashboard.pages.dev"
 ]);
 const corsFor = request => {
@@ -40,7 +41,7 @@ async function authorized(request, env) {
   if(!token || !env.DB) return false;
   const hash=await sha256(token);
   const row=await env.DB.prepare("SELECT expires_at FROM admin_sessions WHERE token_hash=? LIMIT 1").bind(hash).first();
-  return !!row && Number(row.expires_at)>Math.floor(Date.now()/1000);
+  return !!row && Number(row.expires_at)>Date.now();
 }
 const makeOrderNumber = async (env) => {
   const now=new Date();
