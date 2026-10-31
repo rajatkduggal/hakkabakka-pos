@@ -41,7 +41,8 @@ async function authorized(request,env) {
   const token=tokenFrom(request);
   if(!token||!env.DB)return false;
   const hash=await sha256(token);
-  const row=await env.DB.prepare("SELECT expires_at FROM admin_sessions WHERE token_hash=? LIMIT 1").bind(hash).first();
+  const authDb=env.AUTH_DB||env.DB;
+  const row=await authDb.prepare("SELECT expires_at FROM admin_sessions WHERE token_hash=? LIMIT 1").bind(hash).first();
   return !!row&&Number(row.expires_at)>Date.now();
 }
 const makeOrderNumber=async env=>{
@@ -61,8 +62,13 @@ export default {async fetch(request,env){
       return json({tables:rows.results||[]},200,request);
     }
     if(path==="/api/orders"&&request.method==="GET"){
-      const rows=await env.ORDERS.prepare("SELECT order_number,customer_name,mobile,items_json,total_amount,payment_method,payment_status,order_status,created_at FROM orders ORDER BY id DESC LIMIT 100").all();
-      return json({orders:(rows.results||[]).map(r=>({...r,details:safeJson(r.items_json)}))},200,request);
+      const [posRows,onlineRows]=await Promise.all([
+       env.ORDERS.prepare("SELECT order_number,customer_name,mobile,items_json,total_amount,payment_method,payment_status,order_status,created_at FROM orders ORDER BY id DESC LIMIT 100").all(),
+       env.CUSTOMER_ORDERS.prepare("SELECT order_number,customer_name,mobile,items_json,total_amount,payment_method,payment_status,order_status,created_at,upi_reference FROM orders ORDER BY id DESC LIMIT 100").all()
+      ]);
+      const pos=(posRows.results||[]).map(r=>({...r,source:"POS",details:safeJson(r.items_json)}));
+      const online=(onlineRows.results||[]).map(r=>({...r,source:"ONLINE",details:safeJson(r.items_json)}));
+      return json({orders:[...pos,...online].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,150)},200,request);
     }
     if(path==="/api/orders"&&request.method==="POST"){
       const body=await request.json(),type=String(body.order_type||"").toUpperCase();
@@ -90,9 +96,14 @@ export default {async fetch(request,env){
       if(!["PENDING","PAID","FAILED","REFUNDED"].includes(paymentStatus))return json({error:"Invalid payment status"},400,request);
       const order=decodeURIComponent(paymentMatch[1]);
       if(paymentStatus==="PAID"){
-        const current=await env.ORDERS.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();
+        let current=await env.ORDERS.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();
+        const db=current?env.ORDERS:env.CUSTOMER_ORDERS;
+        if(!current)current=await env.CUSTOMER_ORDERS.prepare("SELECT payment_status FROM orders WHERE order_number=?").bind(order).first();
         if(!current)return json({error:"Order not found"},404,request);
         if(current.payment_status==="PAID")return json({success:true,payment_status:"PAID",already_paid:true},200,request);
+        const result=await db.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,order).run();
+        if(!result.meta.changes)return json({error:"Order not found"},404,request);
+        return json({success:true,payment_status:paymentStatus,manual_confirmation:true,source:db===env.ORDERS?"POS":"ONLINE"},200,request);
       }
       const result=await env.ORDERS.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,order).run();
       if(!result.meta.changes)return json({error:"Order not found"},404,request);
