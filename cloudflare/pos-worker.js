@@ -37,8 +37,7 @@ const makeOrderNumber = async (env) => {
   const now=new Date();
   const ym=now.getFullYear().toString()+String(now.getMonth()+1).padStart(2,"0");
   await env.DB.prepare("INSERT OR IGNORE INTO pos_order_counters(year_month,last_number) VALUES(?,0)").bind(ym).run();
-  await env.DB.prepare("UPDATE pos_order_counters SET last_number=last_number+1 WHERE year_month=?").bind(ym).run();
-  const row=await env.DB.prepare("SELECT last_number FROM pos_order_counters WHERE year_month=?").bind(ym).first();
+  const row=await env.DB.prepare("UPDATE pos_order_counters SET last_number=last_number+1 WHERE year_month=? RETURNING last_number").bind(ym).first();
   return "HB-POS-"+ym+"-"+String(row.last_number).padStart(5,"0");
 };
 export default {
@@ -82,6 +81,14 @@ export default {
     await env.ORDERS.batch([insert]);
     if(type==="DINE_IN") await env.DB.prepare("UPDATE pos_tables SET status='OCCUPIED',current_order_number=?,updated_at=datetime('now') WHERE table_no=?").bind(orderNo,table).run();
     return json({success:true,order_number:orderNo,status:"NEW",payment_status:"PENDING",total},201);
+   }
+   const paymentMatch=path.match(/^\/api\/orders\/([^/]+)\/payment$/);
+   if(paymentMatch && request.method==="PATCH") {
+    const paymentStatus=String((await request.json()).payment_status||"").toUpperCase();
+    if(!["PENDING","PAID","FAILED","REFUNDED"].includes(paymentStatus)) return json({error:"Invalid payment status"},400);
+    const result=await env.ORDERS.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,decodeURIComponent(paymentMatch[1])).run();
+    if(!result.meta.changes) return json({error:"Order not found"},404);
+    return json({success:true,payment_status:paymentStatus,manual_confirmation:true});
    }
    const statusMatch=path.match(/^\/api\/orders\/([^/]+)\/status$/);
    if(statusMatch && request.method==="PATCH") {
