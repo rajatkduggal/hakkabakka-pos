@@ -6,14 +6,23 @@
  * Auth: requires an existing Admin session token (Bearer token or hb_admin_session cookie).
  * Does not expose payment credentials or mark online payments as paid.
  */
-const cors = {
-  "Access-Control-Allow-Origin": "https://hakkabakka.in",
-  "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Vary": "Origin"
+const allowedOrigins = new Set([
+  "https://hakkabakka.in",
+  "https://www.hakkabakka.in",
+  "https://hakkabakka-customer-preview.pages.dev",
+  "https://54d485f0.hakkabakka-admin-dashboard.pages.dev"
+]);
+const corsFor = request => {
+  const origin=request.headers.get("Origin")||"";
+  return {
+    "Access-Control-Allow-Origin": allowedOrigins.has(origin) ? origin : "https://hakkabakka.in",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Vary": "Origin"
+  };
 };
-const json = (data, status=200) => new Response(JSON.stringify(data), {
-  status, headers: { "Content-Type":"application/json; charset=utf-8", ...cors }
+const json = (data, status=200, request) => new Response(JSON.stringify(data), {
+  status, headers: { "Content-Type":"application/json; charset=utf-8", ...corsFor(request) }
 });
 const sha256 = async value => {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -42,35 +51,35 @@ const makeOrderNumber = async (env) => {
 };
 export default {
  async fetch(request,env) {
-  if(request.method==="OPTIONS") return new Response(null,{status:204,headers:cors});
+  if(request.method==="OPTIONS") return new Response(null,{status:204,headers:corsFor(request)});
   const url=new URL(request.url), path=url.pathname.replace(/\/+$/,"")||"/";
-  if(path==="/health") return json({ok:true,service:"hakkabakka-pos-api",mode:"cloudflare-d1"});
-  if(!await authorized(request,env)) return json({error:"Admin session required"},401);
+  if(path==="/health") return json({ok:true,service:"hakkabakka-pos-api",mode:"cloudflare-d1"},200,request);
+  if(!await authorized(request,env)) return json({error:"Admin session required"},401,request);
   try {
    if(path==="/api/tables" && request.method==="GET") {
     const rows=await env.DB.prepare("SELECT table_no,status,current_order_number,updated_at FROM pos_tables ORDER BY table_no").all();
-    return json({tables:rows.results||[]});
+    return json({tables:rows.results||[]},200,request);
    }
    if(path==="/api/orders" && request.method==="GET") {
     const rows=await env.ORDERS.prepare("SELECT order_number,customer_name,mobile,items_json,total_amount,payment_method,payment_status,order_status,created_at FROM orders ORDER BY id DESC LIMIT 100").all();
-    return json({orders:(rows.results||[]).map(r=>({...r,details:safeJson(r.items_json)}))});
+    return json({orders:(rows.results||[]).map(r=>({...r,details:safeJson(r.items_json)}))},200,request);
    }
    if(path==="/api/orders" && request.method==="POST") {
     const body=await request.json();
     const type=String(body.order_type||"").toUpperCase();
-    if(!["DINE_IN","TAKEAWAY","DELIVERY"].includes(type)) return json({error:"Invalid order type"},400);
+    if(!["DINE_IN","TAKEAWAY","DELIVERY"].includes(type)) return json({error:"Invalid order type"},400,request);
     const table=type==="DINE_IN"?Number(body.table_no):null;
-    if(type==="DINE_IN" && (!Number.isInteger(table)||table<1||table>20)) return json({error:"Select a valid table"},400);
+    if(type==="DINE_IN" && (!Number.isInteger(table)||table<1||table>20)) return json({error:"Select a valid table"},400,request);
     const items=Array.isArray(body.items)?body.items.map(x=>({name:String(x.name||"").trim(),qty:Number(x.qty),price:Number(x.price)})): [];
-    if(!items.length || items.some(x=>!x.name||!Number.isInteger(x.qty)||x.qty<1||!Number.isFinite(x.price)||x.price<0)) return json({error:"Invalid items"},400);
+    if(!items.length || items.some(x=>!x.name||!Number.isInteger(x.qty)||x.qty<1||!Number.isFinite(x.price)||x.price<0)) return json({error:"Invalid items"},400,request);
     const subtotal=items.reduce((s,x)=>s+x.qty*x.price,0);
     const delivery=type==="DELIVERY"?Math.max(0,Number(body.delivery_charges||0)):0;
     const total=Number((subtotal+delivery).toFixed(2));
-    if(!Number.isFinite(total)||total<=0) return json({error:"Invalid total"},400);
+    if(!Number.isFinite(total)||total<=0) return json({error:"Invalid total"},400,request);
     if(type==="DINE_IN") {
       const t=await env.DB.prepare("SELECT status FROM pos_tables WHERE table_no=?").bind(table).first();
-      if(!t) return json({error:"Table not configured"},400);
-      if(t.status==="OCCUPIED" && !body.allow_table_reuse) return json({error:"Table is occupied"},409);
+      if(!t) return json({error:"Table not configured"},400,request);
+      if(t.status==="OCCUPIED" && !body.allow_table_reuse) return json({error:"Table is occupied"},409,request);
     }
     const orderNo=await makeOrderNumber(env);
     const detail={source:"POS",order_type:type,table_no:table,items,food_total:subtotal,delivery_charges:delivery,special_instructions:String(body.special_instructions||"")};
@@ -80,35 +89,35 @@ export default {
     if(type==="DINE_IN") statements.push(env.DB.prepare("UPDATE pos_tables SET status='OCCUPIED',current_order_number=?,updated_at=datetime('now') WHERE table_no=?").bind(orderNo,table));
     await env.ORDERS.batch([insert]);
     if(type==="DINE_IN") await env.DB.prepare("UPDATE pos_tables SET status='OCCUPIED',current_order_number=?,updated_at=datetime('now') WHERE table_no=?").bind(orderNo,table).run();
-    return json({success:true,order_number:orderNo,status:"NEW",payment_status:"PENDING",total},201);
+    return json({success:true,order_number:orderNo,status:"NEW",payment_status:"PENDING",total},201,request);
    }
    const paymentMatch=path.match(/^\/api\/orders\/([^/]+)\/payment$/);
    if(paymentMatch && request.method==="PATCH") {
     const paymentStatus=String((await request.json()).payment_status||"").toUpperCase();
-    if(!["PENDING","PAID","FAILED","REFUNDED"].includes(paymentStatus)) return json({error:"Invalid payment status"},400);
+    if(!["PENDING","PAID","FAILED","REFUNDED"].includes(paymentStatus)) return json({error:"Invalid payment status"},400,request);
     const result=await env.ORDERS.prepare("UPDATE orders SET payment_status=? WHERE order_number=?").bind(paymentStatus,decodeURIComponent(paymentMatch[1])).run();
-    if(!result.meta.changes) return json({error:"Order not found"},404);
-    return json({success:true,payment_status:paymentStatus,manual_confirmation:true});
+    if(!result.meta.changes) return json({error:"Order not found"},404,request);
+    return json({success:true,payment_status:paymentStatus,manual_confirmation:true},200,request);
    }
    const statusMatch=path.match(/^\/api\/orders\/([^/]+)\/status$/);
    if(statusMatch && request.method==="PATCH") {
     const status=String((await request.json()).status||"").toUpperCase();
-    if(!["NEW","ACCEPTED","PREPARING","READY","OUT_FOR_DELIVERY","COMPLETED","CANCELLED"].includes(status)) return json({error:"Invalid status"},400);
+    if(!["NEW","ACCEPTED","PREPARING","READY","OUT_FOR_DELIVERY","COMPLETED","CANCELLED"].includes(status)) return json({error:"Invalid status"},400,request);
     const result=await env.ORDERS.prepare("UPDATE orders SET order_status=? WHERE order_number=?").bind(status,decodeURIComponent(statusMatch[1])).run();
-    if(!result.meta.changes) return json({error:"Order not found"},404);
+    if(!result.meta.changes) return json({error:"Order not found"},404,request);
     if(["COMPLETED","CANCELLED"].includes(status)) {
       const row=await env.ORDERS.prepare("SELECT items_json FROM orders WHERE order_number=?").bind(decodeURIComponent(statusMatch[1])).first();
       const details=safeJson(row?.items_json);
       if(details?.table_no) await env.DB.prepare("UPDATE pos_tables SET status='AVAILABLE',current_order_number=NULL,updated_at=datetime('now') WHERE table_no=? AND current_order_number=?").bind(details.table_no,decodeURIComponent(statusMatch[1])).run();
     }
-    return json({success:true,status});
+    return json({success:true,status},200,request);
    }
    if(path==="/api/reports/daily" && request.method==="GET") {
     const rows=await env.ORDERS.prepare("SELECT COUNT(*) order_count,COALESCE(SUM(total_amount),0) gross_sales FROM orders WHERE date(created_at)=date('now','localtime') AND json_extract(items_json,'$.source')='POS'").first();
-    return json({date:new Date().toISOString().slice(0,10),orders:rows?.order_count||0,gross_sales:rows?.gross_sales||0});
+    return json({date:new Date().toISOString().slice(0,10),orders:rows?.order_count||0,gross_sales:rows?.gross_sales||0},200,request);
    }
-   return json({error:"Not found"},404);
-  } catch(error) { console.error("POS API error",error); return json({error:"POS request failed"},500); }
+   return json({error:"Not found"},404,request);
+  } catch(error) { console.error("POS API error",error); return json({error:"POS request failed"},500,request); }
  }
 };
 function safeJson(value){try{return JSON.parse(value||"{}")}catch{return {}}}
