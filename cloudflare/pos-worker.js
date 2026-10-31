@@ -15,8 +15,9 @@ const allowedOrigins = new Set([
 ]);
 const corsFor = request => {
   const origin=request.headers.get("Origin")||"";
+  const allowed=allowedOrigins.has(origin) || /^https:\/\/[a-z0-9-]+\.hakkabakka-customer-preview\.pages\.dev$/.test(origin);
   return {
-    "Access-Control-Allow-Origin": allowedOrigins.has(origin) ? origin : "https://hakkabakka.in",
+    "Access-Control-Allow-Origin": allowed ? origin : "https://hakkabakka.in",
     "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
     "Vary": "Origin"
