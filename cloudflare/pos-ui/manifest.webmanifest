@@ -1,0 +1,11 @@
+{
+  "name": "HakkaBakka POS",
+  "short_name": "HB POS",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f0e6",
+  "theme_color": "#521719",
+  "description": "HakkaBakka restaurant billing and kitchen POS",
+  "icons": []
+}
