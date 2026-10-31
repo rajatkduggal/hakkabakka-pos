@@ -1,0 +1,18 @@
+{
+  "name": "HakkaBakka POS",
+  "short_name": "HB POS",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff8e8",
+  "theme_color": "#8d101c",
+  "description": "HakkaBakka Punjabi Dhaba billing and kitchen POS",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
