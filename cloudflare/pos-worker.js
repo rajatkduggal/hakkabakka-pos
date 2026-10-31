@@ -57,6 +57,10 @@ export default {async fetch(request,env){
   if(path==="/health")return json({ok:true,service:"hakkabakka-pos-api",mode:"cloudflare-d1"},200,request);
   if(!await authorized(request,env))return json({error:"Admin session required"},401,request);
   try{
+    if(path==="/api/menu"&&request.method==="GET"){
+      const rows=await env.AUTH_DB.prepare("SELECT id,name,category,price,image_url FROM menu_items WHERE is_published=1 AND available=1 ORDER BY sort_order,name").all();
+      return json({items:(rows.results||[]).map(x=>({id:x.id,name:x.name,category:x.category,price:Number(x.price),image_url:x.image_url||""}))},200,request);
+    }
     if(path==="/api/tables"&&request.method==="GET"){
       const rows=await env.DB.prepare("SELECT table_no,status,current_order_number,updated_at FROM pos_tables ORDER BY table_no").all();
       return json({tables:rows.results||[]},200,request);
