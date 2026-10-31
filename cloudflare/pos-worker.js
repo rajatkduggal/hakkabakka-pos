@@ -23,7 +23,7 @@ function tokenFrom(request) {
   const auth=request.headers.get("Authorization")||"";
   if(auth.startsWith("Bearer ")) return auth.slice(7).trim();
   const cookie=request.headers.get("Cookie")||"";
-  const match=cookie.match(/(?:^|;\\s*)hb_admin_session=([^;]+)/);
+  const match=cookie.match(/(?:^|;\s*)hb_admin_session=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : "";
 }
 async function authorized(request, env) {
@@ -44,7 +44,7 @@ const makeOrderNumber = async (env) => {
 export default {
  async fetch(request,env) {
   if(request.method==="OPTIONS") return new Response(null,{status:204,headers:cors});
-  const url=new URL(request.url), path=url.pathname.replace(/\\/+$/,"")||"/";
+  const url=new URL(request.url), path=url.pathname.replace(/\/+$/,"")||"/";
   if(path==="/health") return json({ok:true,service:"hakkabakka-pos-api",mode:"cloudflare-d1"});
   if(!await authorized(request,env)) return json({error:"Admin session required"},401);
   try {
@@ -83,7 +83,7 @@ export default {
     if(type==="DINE_IN") await env.DB.prepare("UPDATE pos_tables SET status='OCCUPIED',current_order_number=?,updated_at=datetime('now') WHERE table_no=?").bind(orderNo,table).run();
     return json({success:true,order_number:orderNo,status:"NEW",payment_status:"PENDING",total},201);
    }
-   const statusMatch=path.match(/^\\/api\\/orders\\/([^/]+)\\/status$/);
+   const statusMatch=path.match(/^\/api\/orders\/([^/]+)\/status$/);
    if(statusMatch && request.method==="PATCH") {
     const status=String((await request.json()).status||"").toUpperCase();
     if(!["NEW","ACCEPTED","PREPARING","READY","OUT_FOR_DELIVERY","COMPLETED","CANCELLED"].includes(status)) return json({error:"Invalid status"},400);
