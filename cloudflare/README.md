@@ -1,22 +1,26 @@
 # HakkaBakka POS — Cloudflare D1 integration branch
 
-This branch is an isolated preview. The live customer website, online checkout, UPI settings and production orders must remain unchanged during setup and testing.
+This branch is an isolated preview. The live customer website, online checkout, UPI settings and production orders remain unchanged.
 
-## Database plan
-- Existing admin D1: admin sessions, menu catalogue, 20 dine-in tables and monthly POS order-number counters.
-- Existing orders D1: shared order ledger for POS and online orders.
-- `cloudflare/migrations/0001_pos_tables.sql`: additive 20-table and counter migration.
-- `cloudflare/migrations/0002_pos_operations_draft.sql`: draft-only operational tables for order metadata/items, payment attempts, KOT/reprints, cashier shifts, cash movements and audit history.
+## Database status
+- Preview admin D1: backup/export completed before schema extension.
+- Preview admin D1: 20 tables are present and all are AVAILABLE.
+- Preview admin D1: monthly POS order counter exists.
+- Preview admin D1: operational tables successfully applied: order metadata, item snapshots, payment attempts, KOT/reprints, cashier shifts, cash movements and audit log.
+- Preview orders D1: existing `orders` table inspected; no test orders inserted.
+- Production admin/orders databases were inspected read-only only; no writes made.
+- `cloudflare/migrations/0002_pos_operations_draft.sql` remains the reproducible SQL source for the applied preview schema.
 
 ## Agreed operating setup
 - 20 tables; one billing counter.
-- Thermal printer: PSF588; KOT print and reprint workflow to be tested on the actual device.
+- Thermal printer: PSF588; KOT print and reprint workflow must be tested on the physical device.
 - Dine-in, takeaway, delivery and online orders.
 - Payment records default to PENDING. UPI screenshot/reference is not automatic payment verification.
 - Order number sequence: monthly counter; format HB-POS-YYYYMM-00001.
 - Cloudflare Workers + D1 only. No Railway.
 
-## Important status
-The operational migration is a draft and has NOT been applied to any database. Before applying it, confirm the target preview D1 database, take a backup, inspect the existing schema, and test migration in isolation. Do not apply it to production during setup.
-
-The current POS login proxy still depends on the separate Admin API route. The known `/api/login` upstream currently returns HTTP 404; do not work around this by guessing an endpoint or pointing POS at the customer orders Worker.
+## Remaining blockers
+- POS login currently reports upstream HTTP 404; route exists in the Admin API source, so deployed routing/response mismatch must be isolated before changing authentication.
+- POS API must be tested after login, including menu/table/order/report routes.
+- Do not create production test orders or mark real payments paid.
+- Do not point a public production domain to the preview Worker until authentication, end-to-end flows and printer tests pass.
