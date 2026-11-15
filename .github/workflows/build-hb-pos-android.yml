@@ -21,6 +21,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+      - name: Configure Firebase for Android build
+        env:
+          FIREBASE_GOOGLE_SERVICES_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$FIREBASE_GOOGLE_SERVICES_JSON" ]; then
+            echo "Missing GitHub Actions secret FIREBASE_GOOGLE_SERVICES_JSON."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON" > app/google-services.json
       - name: Build debug APK
         run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
