@@ -1,0 +1,20 @@
+-- HakkaBakka POS additive migration for the existing hakkabakka-admin D1 database.
+-- Apply only after taking a D1 backup and confirming the target database.
+CREATE TABLE IF NOT EXISTS pos_tables (
+  table_no INTEGER PRIMARY KEY CHECK (table_no BETWEEN 1 AND 20),
+  status TEXT NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE','OCCUPIED')),
+  current_order_number TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO pos_tables(table_no,status)
+SELECT n,'AVAILABLE' FROM (
+  SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+  UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+  UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15
+  UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20
+);
+CREATE TABLE IF NOT EXISTS pos_order_counters (
+  year_month TEXT PRIMARY KEY,
+  last_number INTEGER NOT NULL DEFAULT 0 CHECK(last_number >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_pos_tables_status ON pos_tables(status);
