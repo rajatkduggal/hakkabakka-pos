@@ -12,6 +12,7 @@ import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : AppCompatActivity() {
@@ -22,8 +23,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         HbMessagingService.createChannels(this)
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            getSharedPreferences("hbpos", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
+        if (FirebaseApp.getApps(this).isNotEmpty()) {
+            FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+                getSharedPreferences("hbpos", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
+            }
         }
         web = WebView(this)
         web.settings.javaScriptEnabled = true
