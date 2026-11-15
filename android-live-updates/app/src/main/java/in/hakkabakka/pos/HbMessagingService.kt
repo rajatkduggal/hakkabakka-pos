@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
-import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -16,7 +15,7 @@ import com.google.firebase.messaging.RemoteMessage
 class HbMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         getSharedPreferences("hbpos", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
-        // Token registration with Cloudflare is enabled after the Firebase project is linked.
+        // Cloudflare token registration is connected once the Firebase project credentials are configured.
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -27,11 +26,8 @@ class HbMessagingService : FirebaseMessagingService() {
         val customer = d["customer_name"] ?: "Online customer"
         val total = d["total"] ?: "0"
         val items = d["items"] ?: "Please review the order"
-        if (type == "ORDER_PROGRESS") {
-            showProgressUpdate(orderNo, customer, total, d["status"] ?: "PREPARING")
-        } else {
-            showNewOrder(orderNo, customer, total, items)
-        }
+        if (type == "ORDER_PROGRESS") showProgressUpdate(orderNo, customer, total, d["status"] ?: "PREPARING")
+        else showNewOrder(orderNo, customer, total, items)
     }
 
     private fun showNewOrder(no: String, customer: String, total: String, items: String) {
@@ -41,7 +37,7 @@ class HbMessagingService : FirebaseMessagingService() {
         }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(this, CHANNEL_NEW)
             .setSmallIcon(R.drawable.ic_hb_notification)
-            .setContentTitle("🔔 HakkaBakka · New Order")
+            .setContentTitle("HakkaBakka · NEW ORDER")
             .setContentText("$no · $customer · ₹$total")
             .setStyle(NotificationCompat.BigTextStyle().bigText("Order: $no\nCustomer: $customer\nTotal: ₹$total\n$items"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -55,18 +51,8 @@ class HbMessagingService : FirebaseMessagingService() {
     }
 
     private fun showProgressUpdate(no: String, customer: String, total: String, status: String) {
-        val stage = when (status.uppercase()) {
-            "PREPARING" -> 1
-            "READY" -> 2
-            "COMPLETED" -> 3
-            else -> 0
-        }
-        val title = when (stage) {
-            1 -> "Preparing order $no"
-            2 -> "Order $no is ready"
-            3 -> "Order $no completed"
-            else -> "Order $no"
-        }
+        val stage = when (status.uppercase()) { "PREPARING" -> 1; "READY" -> 2; "COMPLETED" -> 3; else -> 0 }
+        val title = when (stage) { 1 -> "Preparing order $no"; 2 -> "Order $no is ready"; 3 -> "Order $no completed"; else -> "Order $no" }
         val open = PendingIntent.getActivity(this, no.hashCode(), Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = Notification.Builder(this, CHANNEL_PROGRESS)
@@ -94,7 +80,7 @@ class HbMessagingService : FirebaseMessagingService() {
                     Notification.ProgressStyle.Point(100).setColor(Color.rgb(40,120,75))
                 ))
             builder.setStyle(style)
-            if (Build.VERSION.SDK_INT >= 36) builder.setShortCriticalText(status.take(7))
+            builder.setShortCriticalText(status.take(7))
         } else {
             builder.setStyle(Notification.BigTextStyle().bigText("Order: $no\n$customer · ₹$total\nStatus: $status"))
         }
@@ -117,8 +103,7 @@ class HbMessagingService : FirebaseMessagingService() {
                     setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION).build())
                 }
                 val progress = NotificationChannel(CHANNEL_PROGRESS, "Active order progress", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "Live progress while the admin prepares an accepted order"
-                    setShowBadge(true)
+                    description = "Progress after admin accepts and starts preparing an order"
                 }
                 m.createNotificationChannel(newOrders)
                 m.createNotificationChannel(progress)
