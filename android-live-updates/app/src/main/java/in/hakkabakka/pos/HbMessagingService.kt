@@ -1,4 +1,6 @@
-package in.hakkabakka.pos
+package `in`.hakkabakka.pos
+
+import `in`.hakkabakka.pos.R
 
 import android.app.Notification
 import android.app.NotificationChannel
