@@ -1,4 +1,4 @@
-package in.hakkabakka.pos
+package `in`.hakkabakka.pos
 
 import android.Manifest
 import android.content.Intent
