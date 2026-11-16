@@ -63,12 +63,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) showLoadError("Network error: ${error.description}")
+                if (request.isForMainFrame) showLoadError("Network error: ${error.description}", request.url.toString())
             }
 
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
                 if (request.isForMainFrame && response.statusCode >= 400) {
-                    showLoadError("Server error: HTTP ${response.statusCode}")
+                    showLoadError("Server error: HTTP ${response.statusCode}", request.url.toString())
                 }
             }
 
@@ -82,14 +82,14 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState != null) web.restoreState(savedInstanceState) else web.loadUrl(posUrl)
     }
 
-    private fun showLoadError(message: String) {
+    private fun showLoadError(message: String, failedUrl: String = posUrl) {
         val safe = message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         val html = """
             <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
             <style>body{font-family:Arial;background:#f5f4f7;color:#26221f;padding:28px;text-align:center}
             .card{background:white;border-radius:18px;padding:26px;margin-top:20vh;box-shadow:0 4px 20px #0001}
             button{background:#2b211b;color:white;border:0;border-radius:12px;padding:14px 24px;font-size:17px;margin-top:18px}</style></head>
-            <body><div class="card"><h2>HakkaBakka POS</h2><p>POS load nahi ho paaya.</p><p>$safe</p>
+            <body><div class="card"><h2>HakkaBakka POS</h2><p>POS load nahi ho paaya.</p><p>$safe</p><p style="font-size:12px;word-break:break-all;color:#777">Request: ${failedUrl.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")}</p>
             <button onclick="location.href='$posUrl'">Retry</button></div></body></html>
         """.trimIndent()
         web.loadDataWithBaseURL(posUrl, html, "text/html", "UTF-8", null)
